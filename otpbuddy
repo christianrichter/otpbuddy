@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+import signal
+import time
+from configparser import ConfigParser
+from pathlib import Path
+from threading import Thread
+
+import gi
+import pyotp
+from gi.repository import GLib
+
+gi.require_version('Gtk', '3.0')
+gi.require_version('AppIndicator3', '0.1')
+
+from gi.repository import AppIndicator3
+from gi.repository import Gdk
+from gi.repository import Gtk
+
+
+class Indicator:
+    def __init__(self):
+
+        self.secrets = {}
+        self.load_config()
+
+        self.generators = {}
+
+        self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        self.app = 'otp_buddy'
+
+        iconpath = "dialog-password-symbolic"
+        self.indicator = AppIndicator3.Indicator.new(
+            self.app,
+            iconpath,
+            AppIndicator3.IndicatorCategory.OTHER)
+        self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+        self.indicator.set_menu(self.create_menu())
+
+        self.update = Thread(target=self.show_seconds)
+        # daemonize the thread to make the indicator stopable
+        self.update.setDaemon(True)
+        self.update.start()
+
+    def create_menu(self):
+        menu = Gtk.Menu()
+
+        for id, secret in self.secrets.items():
+            gen = pyotp.TOTP(secret)
+            item = Gtk.MenuItem(label=f"{id} {gen.now()}")
+            item.connect('activate', self.copy_clip)
+            menu.append(item)
+            self.generators.update({id: {'item': item, 'gen': pyotp.TOTP(secret).now}})
+
+        # # separator
+        menu_sep = Gtk.SeparatorMenuItem()
+        menu.append(menu_sep)
+        # quit
+        item_quit = Gtk.MenuItem(label='Quit')
+        item_quit.connect('activate', self.stop)
+        menu.append(item_quit)
+        menu.show_all()
+        return menu
+
+    def copy_clip(self, item):
+        otp_code = item.get_child().get_text()[-6:]
+        self.clipboard.set_text(otp_code, -1)
+
+    def show_seconds(self):
+        while True:
+            time.sleep(2)
+
+            for id, elem in self.generators.items():
+                item = elem['item']
+                gen = elem['gen']
+                mention = f'{id} {gen()}'
+                # apply the interface update using  GObject.idle_add()
+                GLib.idle_add(
+                    item.get_child().set_text,
+                    mention,
+                    priority=GLib.PRIORITY_DEFAULT
+                    )
+
+    def stop(self, source):
+        Gtk.main_quit()
+
+    def load_config(self):
+
+        config_file = Path.home() / '.otp.buddy'
+        config = ConfigParser()
+        config.read(config_file)
+
+        self.secrets = {}
+        for section in config.sections():
+            for (key, val) in config.items(section):
+                self.secrets.update({key: val})
+
+
+Indicator()
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+Gtk.main()

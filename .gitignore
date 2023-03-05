@@ -1,0 +1,7 @@
+debian/otpbuddy
+debian/*.log
+debian/otpbuddy.substvars
+debian/files
+debian/debhelper-build-stamp
+debian/.debhelper
+.idea/

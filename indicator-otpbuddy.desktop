@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Exec=/usr/bin/otpbuddy
+Icon=/usr/share/otpbuddy/otpbuddy.png
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=otpbuddy
+Comment=Displays configured MFA codes.
+Keywords=login,passwords
+OnlyShowIn=GNOME;Unity;
+StartupNotify=false
+AutostartCondition=GNOME3 unless-session gnome
